@@ -1,0 +1,119 @@
+{
+    "appKeys": {
+        "city": 5,
+        "cur_temp": 0,
+        "description": 4,
+        "icon": 3,
+        "max_temp": 2,
+        "min_temp": 1
+    },
+    "capabilities": [
+        "location"
+    ],
+    "companyName": "mike.sajak@gmail.com",
+    "longName": "Weather Watchface",
+    "projectType": "native",
+    "resources": {
+        "media": [
+            {
+                "file": "images/night_mode.png",
+                "name": "IMAGE_NIGHT_MODE",
+                "type": "png-trans"
+            },
+            {
+                "characterRegex": "[0-9 .:]",
+                "file": "fonts/Dolce Vita.ttf",
+                "name": "FONT_DOLCE_VITA_21",
+                "type": "font"
+            },
+            {
+                "characterRegex": "[0-9 .:]",
+                "file": "fonts/Dolce Vita.ttf",
+                "name": "FONT_DOLCE_VITA_48",
+                "type": "font"
+            },
+            {
+                "file": "images/thunder.png",
+                "name": "IMAGE_THUNDER",
+                "type": "png"
+            },
+            {
+                "file": "images/heavy_rain.png",
+                "name": "IMAGE_HEAVY_RAIN",
+                "type": "png"
+            },
+            {
+                "file": "images/bluetooth.png",
+                "name": "IMAGE_BLUETOOTH",
+                "type": "png-trans"
+            },
+            {
+                "file": "images/charge.png",
+                "name": "IMAGE_BATTERY_CHARGE",
+                "type": "png-trans"
+            },
+            {
+                "file": "images/error.png",
+                "name": "IMAGE_ERROR",
+                "type": "png"
+            },
+            {
+                "file": "images/wind.png",
+                "name": "IMAGE_WIND",
+                "type": "png"
+            },
+            {
+                "file": "images/snow.png",
+                "name": "IMAGE_SNOW",
+                "type": "png"
+            },
+            {
+                "file": "images/sleet.png",
+                "name": "IMAGE_SLEET",
+                "type": "png"
+            },
+            {
+                "file": "images/rain.png",
+                "name": "IMAGE_LIGHT_RAIN",
+                "type": "png"
+            },
+            {
+                "file": "images/partly-cloudy-night.png",
+                "name": "IMAGE_PARTLY_CLOUDY_NIGHT",
+                "type": "png"
+            },
+            {
+                "file": "images/partly-cloudy-day.png",
+                "name": "IMAGE_PARTLY_CLOUDY_DAY",
+                "type": "png"
+            },
+            {
+                "file": "images/fog.png",
+                "name": "IMAGE_FOG",
+                "type": "png"
+            },
+            {
+                "file": "images/cloudy.png",
+                "name": "IMAGE_CLOUDY",
+                "type": "png"
+            },
+            {
+                "file": "images/clear-night.png",
+                "name": "IMAGE_CLEAR_NIGHT",
+                "type": "png"
+            },
+            {
+                "file": "images/clear-day.png",
+                "name": "IMAGE_CLEAR_DAY",
+                "type": "png"
+            }
+        ]
+    },
+    "shortName": "Weather Watchface",
+    "uuid": "1dca7902-8823-4e89-88f0-ab6c0be41fd0",
+    "versionCode": 1,
+    "versionLabel": "1.0",
+    "watchapp": {
+        "watchface": true
+    }
+}
