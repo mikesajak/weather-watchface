@@ -15,6 +15,7 @@ static GBitmap *s_res_image_bluetooth_white;
 static GFont s_res_bitham_42_light;
 static GFont s_res_gothic_18_bold;
 static GBitmap *s_res_image_night_mode_white;
+static GBitmap *s_res_image_shake_white;
 static TextLayer *s_time_textlayer;
 static TextLayer *s_time_sec_textlayer;
 static TextLayer *s_date_textlayer;
@@ -29,6 +30,7 @@ static TextLayer *s_weather_descr1_textlayer;
 static TextLayer *s_weather_time_textlayer;
 static TextLayer *s_weather_retry_textlayer;
 static BitmapLayer *s_night_mode_bitmaplayer;
+static BitmapLayer *s_shake_bitmaplayer;
 static InverterLayer *s_inverterlayer_1;
 static Layer *s_weather_layer;
 
@@ -46,6 +48,7 @@ static void initialise_ui(void) {
   s_res_bitham_42_light = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
   s_res_gothic_18_bold = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
   s_res_image_night_mode_white = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_NIGHT_MODE_WHITE);
+  s_res_image_shake_white = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_SHAKE_WHITE);
   // s_time_textlayer
   s_time_textlayer = text_layer_create(GRect(0, 0, 102, 54));
   text_layer_set_background_color(s_time_textlayer, GColorBlack);
@@ -152,6 +155,11 @@ static void initialise_ui(void) {
   bitmap_layer_set_bitmap(s_night_mode_bitmaplayer, s_res_image_night_mode_white);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_night_mode_bitmaplayer);
   
+  // s_shake_bitmaplayer
+  s_shake_bitmaplayer = bitmap_layer_create(GRect(0, 0, 20, 20));
+  bitmap_layer_set_bitmap(s_shake_bitmaplayer, s_res_image_shake_white);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)s_shake_bitmaplayer);
+  
   // s_inverterlayer_1
   s_inverterlayer_1 = inverter_layer_create(GRect(0, 0, 144, 70));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_inverterlayer_1);
@@ -177,12 +185,14 @@ static void destroy_ui(void) {
   text_layer_destroy(s_weather_time_textlayer);
   text_layer_destroy(s_weather_retry_textlayer);
   bitmap_layer_destroy(s_night_mode_bitmaplayer);
+  bitmap_layer_destroy(s_shake_bitmaplayer);
   inverter_layer_destroy(s_inverterlayer_1);
   layer_destroy(s_weather_layer);
   fonts_unload_custom_font(s_res_font_dolce_vita_48);
   gbitmap_destroy(s_res_image_battery_charge_white);
   gbitmap_destroy(s_res_image_bluetooth_white);
   gbitmap_destroy(s_res_image_night_mode_white);
+  gbitmap_destroy(s_res_image_shake_white);
 }
 // END AUTO-GENERATED UI CODE
 
@@ -216,8 +226,8 @@ typedef struct {
 } NightSavingConfig;
 
 UpdateConfig weather_update_cfg = {
-  .update_delay = 60 * 15, // 15 minutes,
-  .rerequest_delay = 30 // seconds
+  .update_delay = 60 * 15 * 1000, // 15 minutes,
+  .rerequest_delay = 30 * 1000 // 30 seconds
 };
 
 #define MAX_NUM_REREQUESTS 5
@@ -265,50 +275,61 @@ bool is_night_saving_active(NightSavingConfig *cfg, struct tm *time) {
   return cfg->night_saving_enabled && is_inside_interval(&cfg->saving_interval, time);
 }      
 
-bool request_weather_update_if_necessary(struct tm *tick_time) {
-  // check if weather update delay has passed
+AppTimer *weather_update_timer = NULL;
+
+void request_weather_update(void *data) {
   time_t cur_time = time(NULL);
-  time_t delay = !weather_update_status.request_pending ?
-                    weather_update_cfg.update_delay : weather_update_cfg.rerequest_delay;
+  struct tm *tick_time = localtime(&cur_time);
+  APP_LOG(APP_LOG_LEVEL_DEBUG_VERBOSE, "Request weather update - timer handler (%02d:%02d:%02d)",
+         (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec);
+  
   time_t compare_time = !weather_update_status.request_pending ?
                           weather_update_status.last_update_time : weather_update_status.last_request_time;
 
-  if (difftime(cur_time, compare_time) >= delay) {
-    weather_update_status.last_request_time = cur_time;
-    if (!weather_update_status.request_pending) {
-      weather_update_status.request_pending = true;
-      APP_LOG(APP_LOG_LEVEL_INFO, "Requesting weather update (%02d:%02d:%02d)", 
-              (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec);
-    } else {
-      if (weather_update_status.num_retries >= MAX_NUM_REREQUESTS) {
-        // abort re-requesting
-        // switch to normal mode - and try again after regular request delay
-        APP_LOG(APP_LOG_LEVEL_WARNING, "Max number re-requests reached (%0d:%0d:%0d), back off and try again after regular delay %ds", 
-                (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec,
-                (int) weather_update_cfg.update_delay);
-        text_layer_set_text(s_weather_retry_textlayer, "");
-        weather_update_status.num_retries = 0;
-        weather_update_status.request_pending = false;
-        weather_update_status.last_update_time = cur_time; // store last request time, to force regular delay from now
-        return false;
-      } else {
-        APP_LOG(APP_LOG_LEVEL_INFO, "Re-requesting weather update, retry=%d, (%02d:%02d:%02d)", 
-                (int) weather_update_status.num_retries,
-                (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec);
-        weather_update_status.num_retries++;
-        static char retry_text[] = ".....";
-        int i = 0;
-        for (; i < weather_update_status.num_retries; i++) {
-          retry_text[i] = '.';
-        }
-        retry_text[i] = 0;
-        text_layer_set_text(s_weather_retry_textlayer, retry_text);
-      }
-    }
+  weather_update_status.last_request_time = cur_time;
+  if (!weather_update_status.request_pending) {
+    weather_update_status.request_pending = true;
+    APP_LOG(APP_LOG_LEVEL_INFO, "Requesting weather update (%02d:%02d:%02d)", 
+            (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec);
+    
     send_cmd(1,1); // dummy command - send anything to trigger update
-    return true;
+    
+    // schedule rerequeest in case if HTTP request fails
+    weather_update_timer = app_timer_register(weather_update_cfg.rerequest_delay, request_weather_update, NULL);
+    
+  } else {
+    if (weather_update_status.num_retries >= MAX_NUM_REREQUESTS) {
+      // abort re-requesting
+      // switch to normal mode - and try again after regular request delay
+      APP_LOG(APP_LOG_LEVEL_WARNING, "Max number re-requests reached (%0d:%0d:%0d), back off and try again after regular delay %ds", 
+              (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec,
+              (int) weather_update_cfg.update_delay);
+      text_layer_set_text(s_weather_retry_textlayer, "");
+      weather_update_status.num_retries = 0;
+      weather_update_status.request_pending = false;
+//       weather_update_status.last_update_time = cur_time; // store last request time, to force regular delay from now
+      
+      // register next request with regular delay
+      weather_update_timer = app_timer_register(weather_update_cfg.update_delay, request_weather_update, NULL);
+    } else {
+      APP_LOG(APP_LOG_LEVEL_INFO, "Re-requesting weather update, retry=%d, (%02d:%02d:%02d)", 
+              (int) weather_update_status.num_retries,
+              (int) tick_time->tm_hour, (int) tick_time->tm_min, (int) tick_time->tm_sec);
+      weather_update_status.num_retries++;
+      static char retry_text[] = ".....";
+      int i = 0;
+      for (; i < weather_update_status.num_retries; i++) {
+        retry_text[i] = '.';
+      }
+      retry_text[i] = 0;
+      text_layer_set_text(s_weather_retry_textlayer, retry_text);
+      
+      send_cmd(1,1); // dummy command - send anything to trigger update
+      
+      // register next request with shord re-request delay, in case if this HTTP request fails
+      app_timer_register(weather_update_cfg.rerequest_delay, request_weather_update, NULL);
+    }
   }
-  return false;
 }
 
 // forward declaration
@@ -358,15 +379,15 @@ void handle_clock_tick(struct tm *tick_time, TimeUnits units_changed) {
     last_tick_time.tm_hour = tick_time->tm_hour;
   }
   
+  switch_night_saving_mode(tick_time);
   if (!is_night_saving_active(&night_saving_cfg, tick_time)) {  
     strftime(time_sec_text, 3, "%S", tick_time);
     text_layer_set_text(s_time_sec_textlayer, time_sec_text);
     
     last_tick_time.tm_sec = tick_time->tm_sec;
   }
-  switch_night_saving_mode(tick_time);
   
-  request_weather_update_if_necessary(tick_time);
+//   request_weather_update_if_necessary(tick_time);
 }
 
 void switch_night_saving_mode(struct tm *tick_time) {
@@ -534,22 +555,23 @@ void update_weather_description(const char* descr) {
 }
 
 void update_weather_timestamp() {
-//   if (!weather_request_pending) {
-//     return;
-//   }
-  
   weather_update_status.request_pending = false;
   
   //Set time this update came in
   static char time_buffer[] = "XX:XX:XX";
   weather_update_status.last_update_time = time(NULL);
   struct tm *tm = localtime(&weather_update_status.last_update_time);
-  strftime(time_buffer, sizeof(time_buffer), "%H:%M", tm);
+  strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", tm);
   text_layer_set_text(s_weather_time_textlayer, time_buffer);
   text_layer_set_text(s_weather_retry_textlayer, "");
   
-  APP_LOG(APP_LOG_LEVEL_INFO, "Weather update received %s, next request after %ds",
+  APP_LOG(APP_LOG_LEVEL_INFO, "Weather update received %s, next request after %dms",
           time_buffer, (int) weather_update_cfg.update_delay);
+  if (weather_update_timer != NULL) {
+    app_timer_reschedule(weather_update_timer, weather_update_cfg.update_delay);
+  } else {
+    weather_update_timer = app_timer_register(weather_update_cfg.update_delay, request_weather_update, NULL);
+  }
 }
 
 void handle_tuple_change(const Tuple *tuple) {
@@ -645,9 +667,21 @@ void destroy_property_animation(PropertyAnimation **prop_anim) {
   }
 }
 
+AppTimer *shake_timer = NULL;
+void hide_shake_bitmap_handler(void *data) {
+  layer_set_hidden(bitmap_layer_get_layer(s_shake_bitmaplayer), true);
+  shake_timer = NULL;
+}
+
 void accel_tap_handler(AccelAxisType axis, int32_t direction) {
-//   property_animation
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Shake detected: axis=%d, direction=%d", (int) axis, (int) direction);
+  layer_set_hidden(bitmap_layer_get_layer(s_shake_bitmaplayer), false);
+  
+  if (NULL == shake_timer) {
+    shake_timer = app_timer_register(3000, hide_shake_bitmap_handler, NULL);
+  } else {
+    app_timer_reschedule(shake_timer, 3000);
+  }
 }
 
 static void handle_window_unload(Window* window) {
@@ -682,6 +716,7 @@ void show_main_window(void) {
   text_layer_set_text(s_weather_retry_textlayer, "");
   
   layer_set_hidden(bitmap_layer_get_layer(s_night_mode_bitmaplayer), true);
+  layer_set_hidden(bitmap_layer_get_layer(s_shake_bitmaplayer), true);
   
   window_stack_push(s_window, true);
 }
@@ -713,6 +748,13 @@ void init() { // initialization
   handle_bluetooth_event(bluetooth_connection_service_peek());
   APP_LOG(APP_LOG_LEVEL_DEBUG_VERBOSE, "Simulate first battery event - to force refresh");
   handle_battery_event(battery_state_service_peek());
+  APP_LOG(APP_LOG_LEVEL_DEBUG_VERBOSE, "Simulate first time tick - to force refresh");
+  time_t cur_time = time(NULL);
+  struct tm *tm = localtime(&weather_update_status.last_update_time);
+  handle_clock_tick(tm, SECOND_UNIT);
+  
+  APP_LOG(APP_LOG_LEVEL_DEBUG_VERBOSE, "Request weather update right now");
+  weather_update_timer = app_timer_register(3000, request_weather_update, NULL);
 
 //   initialized = false;
   APP_LOG(APP_LOG_LEVEL_DEBUG, "Initialization done.");
@@ -725,6 +767,14 @@ void deinit() { // deinitialization
   battery_state_service_unsubscribe();
   app_message_deregister_callbacks();
   accel_tap_service_unsubscribe();
+  
+  if (NULL != shake_timer) {
+    app_timer_cancel(shake_timer);
+  }
+  if (NULL != weather_update_timer) {
+    app_timer_cancel(weather_update_timer);
+  }
+  
   APP_LOG(APP_LOG_LEVEL_DEBUG, "De-initialization done.");
 }
 

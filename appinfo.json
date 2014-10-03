@@ -16,6 +16,11 @@
     "resources": {
         "media": [
             {
+                "file": "images/shake.png",
+                "name": "IMAGE_SHAKE",
+                "type": "png-trans"
+            },
+            {
                 "file": "images/night_mode.png",
                 "name": "IMAGE_NIGHT_MODE",
                 "type": "png-trans"
