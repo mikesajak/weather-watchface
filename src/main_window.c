@@ -30,9 +30,9 @@ static TextLayer *s_weather_descr1_textlayer;
 static TextLayer *s_weather_time_textlayer;
 static TextLayer *s_weather_retry_textlayer;
 static BitmapLayer *s_night_mode_bitmaplayer;
+static Layer *s_weather_layer;
 static BitmapLayer *s_shake_bitmaplayer;
 static InverterLayer *s_inverterlayer_1;
-static Layer *s_weather_layer;
 
 static void initialise_ui(void) {
   s_window = window_create();
@@ -155,18 +155,18 @@ static void initialise_ui(void) {
   bitmap_layer_set_bitmap(s_night_mode_bitmaplayer, s_res_image_night_mode_white);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_night_mode_bitmaplayer);
   
+  // s_weather_layer
+  s_weather_layer = layer_create(GRect(0, 70, 142, 96));
+  layer_add_child(window_get_root_layer(s_window), (Layer *)s_weather_layer);
+  
   // s_shake_bitmaplayer
-  s_shake_bitmaplayer = bitmap_layer_create(GRect(0, 0, 20, 20));
+  s_shake_bitmaplayer = bitmap_layer_create(GRect(125, 22, 16, 16));
   bitmap_layer_set_bitmap(s_shake_bitmaplayer, s_res_image_shake_white);
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_shake_bitmaplayer);
   
   // s_inverterlayer_1
   s_inverterlayer_1 = inverter_layer_create(GRect(0, 0, 144, 70));
   layer_add_child(window_get_root_layer(s_window), (Layer *)s_inverterlayer_1);
-  
-  // s_weather_layer
-  s_weather_layer = layer_create(GRect(0, 70, 142, 96));
-  layer_add_child(window_get_root_layer(s_window), (Layer *)s_weather_layer);
 }
 
 static void destroy_ui(void) {
@@ -185,9 +185,9 @@ static void destroy_ui(void) {
   text_layer_destroy(s_weather_time_textlayer);
   text_layer_destroy(s_weather_retry_textlayer);
   bitmap_layer_destroy(s_night_mode_bitmaplayer);
+  layer_destroy(s_weather_layer);
   bitmap_layer_destroy(s_shake_bitmaplayer);
   inverter_layer_destroy(s_inverterlayer_1);
-  layer_destroy(s_weather_layer);
   fonts_unload_custom_font(s_res_font_dolce_vita_48);
   gbitmap_destroy(s_res_image_battery_charge_white);
   gbitmap_destroy(s_res_image_bluetooth_white);
@@ -545,8 +545,7 @@ void update_weather_description(const char* descr) {
 //     APP_LOG(APP_LOG_LEVEL_DEBUG, "update_weather_description: size=%d/%d", (int) size, sizeof(descr1_text));
     strncpy(descr1_text, descr, size);
     descr1_text[size] = 0;
-    while (descr[idx] == ' ' && descr[idx] != 0)
-      idx++;
+    while (descr[idx] == ' ' && descr[idx] != 0) idx++;
     strcpy(descr2_text, descr + idx);
   }
   
@@ -562,11 +561,17 @@ void update_weather_timestamp() {
   weather_update_status.last_update_time = time(NULL);
   struct tm *tm = localtime(&weather_update_status.last_update_time);
   strftime(time_buffer, sizeof(time_buffer), "%H:%M:%S", tm);
+  APP_LOG(APP_LOG_LEVEL_INFO, "Weather update received %s, next request after %dms",
+          time_buffer, (int) weather_update_cfg.update_delay);
+  // cut the seconds
+  int8_t idx = sizeof(time_buffer) - 1;
+  while (idx >= 0 && time_buffer[idx] != ':') idx--;
+  time_buffer[idx] = 0;
+  
   text_layer_set_text(s_weather_time_textlayer, time_buffer);
   text_layer_set_text(s_weather_retry_textlayer, "");
   
-  APP_LOG(APP_LOG_LEVEL_INFO, "Weather update received %s, next request after %dms",
-          time_buffer, (int) weather_update_cfg.update_delay);
+          
   if (weather_update_timer != NULL) {
     app_timer_reschedule(weather_update_timer, weather_update_cfg.update_delay);
   } else {
