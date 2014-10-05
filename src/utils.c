@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "utils.h"
 
 void send_cmd(int key, int val) {
   Tuplet value = TupletInteger(key, val);
@@ -30,4 +31,11 @@ void translate_app_error_code(AppMessageResult app_msg_error, char* text_buffer,
     case APP_MSG_INTERNAL_ERROR: strncpy(text_buffer, "APP_MSG_INTERNAL_ERROR", max_len); break;
     default: strncpy(text_buffer, "UNKNOWN", max_len); break;
   }
+}
+
+void make_date_str(char* dest, const struct tm *time, LOCALE locale) {
+  strcpy(dest, WEEKDAY_NAMES[locale][time->tm_wday]);
+  strcat(dest, ", ");
+  strftime(&dest[strlen(dest)], 4, "%e ", time);
+  strcat(dest, MONTH_NAMES[locale][time->tm_mon]);
 }

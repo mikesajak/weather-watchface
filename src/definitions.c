@@ -1,4 +1,4 @@
-#pragma once
+#include "definitions.h"
 
 const char* MONTH_NAMES_EN[] = {
   "January",
@@ -46,16 +46,3 @@ const char** WEEKDAY_NAMES[] = {
   WEEKDAY_NAMES_EN,
   WEEKDAY_NAMES_PL
 };
-
-typedef enum {
-  EN = 0,
-  PL
-} LOCALE;
-
-
-void make_date_str(char* dest, struct tm *time, LOCALE locale) {
-  strcpy(dest, WEEKDAY_NAMES[locale][time->tm_wday]);
-  strcat(dest, ", ");
-  strftime(&dest[strlen(dest)], 4, "%e ", time);
-  strcat(dest, MONTH_NAMES[locale][time->tm_mon]);
-}
